@@ -1,0 +1,3 @@
+gdb --args ./env-fuzz replay ./out/crash/SIGSEGV_libICE.so.6.3.0+72555_m00330.patch
+
+set follow-fork-mode child
