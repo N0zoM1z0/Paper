@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Survey of Firewall & IDS Research</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony Neutrals -->
+    <!-- Application Structure Plan: A dashboard-style SPA featuring a header with key stats, a control panel for filtering (by contribution type, conference), a dynamic bar chart visualizing the filtered data, and a grid of clickable cards for each research paper. Clicking a card opens a modal with detailed information. This structure was chosen to transform the linear report into an exploratory tool, allowing users to quickly grasp trends via the chart and then drill down into specific papers of interest without losing context, promoting user-driven discovery over passive reading. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Paper distribution. Goal: Compare. Viz: Horizontal Bar Chart. Interaction: Filters update chart. Justification: Visualizes research focus areas effectively. Library: Chart.js/Canvas.
+        - Report Info: List of papers. Goal: Organize. Viz: Card grid. Interaction: Filtering hides/shows cards; clicking opens a modal. Justification: Scannable and provides details on demand. Method: HTML/JS.
+        - Report Info: Key trends/synthesis. Goal: Inform. Viz: Accordion. Interaction: Click to expand. Justification: Manages large text blocks. Method: HTML/JS.
+        - All diagrams and layouts use HTML/CSS/Tailwind.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF7;
+            color: #4A4A4A;
+        }
+        .active-filter {
+            background-color: #A67B5B !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        .card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0, 1, 0, 1), padding 0.5s ease;
+        }
+        .accordion-content.open {
+            max-height: 1000px;
+            transition: max-height 1s cubic-bezier(1, 0, 1, 0), padding 0.5s ease;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 500px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="app" class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-5xl font-bold text-[#4A4A4A] mb-2">The Shifting Attack Surface</h1>
+            <p class="text-lg md:text-xl text-[#7a7a7a]">An Interactive Survey of Firewall & IDS Research (2024-2025)</p>
+            <p class="max-w-3xl mx-auto mt-4 text-[#4A4A4A]">This report analyzes premier cybersecurity research, revealing a critical shift from traditional firewalls to vulnerabilities in core internet infrastructure like DNS and NAT. Explore the papers below to understand the new frontiers of network security threats and defenses.</p>
+        </header>
+
+        <section id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12 text-center">
+             <div class="bg-[#F5F0E6] p-4 rounded-lg shadow-sm">
+                <p class="text-3xl font-bold text-[#A67B5B]">18</p>
+                <p class="text-sm text-[#7a7a7a]">Total Papers</p>
+            </div>
+             <div class="bg-[#F5F0E6] p-4 rounded-lg shadow-sm">
+                <p class="text-3xl font-bold text-[#A67B5B]" id="stat-attacks">7</p>
+                <p class="text-sm text-[#7a7a7a]">Novel Attacks</p>
+            </div>
+             <div class="bg-[#F5F0E6] p-4 rounded-lg shadow-sm">
+                <p class="text-3xl font-bold text-[#A67B5B]" id="stat-tools">9</p>
+                <p class="text-sm text-[#7a7a7a]">New Tools & Defenses</p>
+            </div>
+             <div class="bg-[#F5F0E6] p-4 rounded-lg shadow-sm">
+                <p class="text-3xl font-bold text-[#A67B5B]" id="stat-analyses">2</p>
+                <p class="text-sm text-[#7a7a7a]">Systematic Analyses</p>
+            </div>
+        </section>
+
+        <main>
+            <div id="controls" class="bg-white/70 backdrop-blur-sm p-4 rounded-xl shadow-md mb-8 sticky top-4 z-10">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="font-semibold text-gray-700 block mb-2">Filter by Contribution:</label>
+                        <div id="contribution-filters" class="flex flex-wrap gap-2">
+                            <button data-filter-group="contribution" data-filter="All" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition active-filter">All</button>
+                            <button data-filter-group="contribution" data-filter="Novel Attack" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">Novel Attack</button>
+                            <button data-filter-group="contribution" data-filter="New Tool" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">New Tool</button>
+                            <button data-filter-group="contribution" data-filter="Systematic Analysis" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">New Analysis</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-semibold text-gray-700 block mb-2">Filter by Conference:</label>
+                        <div id="conference-filters" class="flex flex-wrap gap-2">
+                            <button data-filter-group="conference" data-filter="All" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition active-filter">All</button>
+                            <button data-filter-group="conference" data-filter="NDSS" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">NDSS</button>
+                            <button data-filter-group="conference" data-filter="ACM CCS" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">ACM CCS</button>
+                            <button data-filter-group="conference" data-filter="USENIX Security" class="filter-btn px-4 py-2 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-100 shadow-sm transition">USENIX</button>
+                        </div>
+                    </div>
+                </div>
+                 <p id="filter-count" class="text-center text-sm text-gray-500 mt-4">Showing 18 papers.</p>
+            </div>
+            
+            <div id="visualization" class="mb-12 bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+                 <h2 class="text-xl font-bold text-center mb-4 text-[#4A4A4A]">Research Focus by Technology Target</h2>
+                 <p class="text-center text-sm text-gray-500 mb-6">This chart shows the number of papers targeting specific technologies, updated by your filters. It highlights where the research community is focusing its efforts.</p>
+                <div class="chart-container">
+                    <canvas id="papersChart"></canvas>
+                </div>
+            </div>
+
+            <div id="papers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+        </main>
+        
+        <section id="synthesis" class="mt-16">
+             <h2 class="text-3xl font-bold text-center mb-8 text-[#4A4A4A]">Synthesis & Future Directions</h2>
+             <div class="max-w-4xl mx-auto space-y-4">
+                 <div class="accordion-item bg-white rounded-lg shadow-md">
+                     <button class="accordion-header w-full text-left p-4 font-semibold text-lg flex justify-between items-center">
+                         <span>Observable Trends</span>
+                         <span class="accordion-icon text-2xl font-light transform transition-transform">+</span>
+                     </button>
+                     <div class="accordion-content">
+                         <div class="p-4 border-t border-gray-200 text-gray-700 space-y-2">
+                            <p><strong>The Primacy of DNS Security:</strong> A remarkable concentration of high-impact research focuses on DNS. This trend marks a shift in perspective, recognizing that the security of DNS infrastructure is a prerequisite for nearly all other network security controls.</p>
+                            <p><strong>The Ascendance of Logical & Algorithmic Attacks:</strong> The most significant novel attacks presented target the inherent logic and complexity of protocols, rather than memory corruption. These attacks are stealthier and often stem from flaws in the standards themselves.</p>
+                            <p><strong>The Specialization of Fuzzing:</strong> The most effective tools are no longer generic fuzzers. Instead, they are highly domain-aware frameworks tailored to specific, hardened targets, demonstrating a maturation of the field toward intelligent, targeted testing.</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="accordion-item bg-white rounded-lg shadow-md">
+                     <button class="accordion-header w-full text-left p-4 font-semibold text-lg flex justify-between items-center">
+                         <span>Common Vulnerability Patterns</span>
+                         <span class="accordion-icon text-2xl font-light transform transition-transform">+</span>
+                     </button>
+                     <div class="accordion-content">
+                         <div class="p-4 border-t border-gray-200 text-gray-700 space-y-2">
+                             <p><strong>Implementation Divergence from Standards:</strong> A primary source of weakness is the gap between how protocols are specified in RFCs and how they are actually implemented by vendors.</p>
+                             <p><strong>Semantic Gaps and Parser Differentials:</strong> This pattern, where a security middlebox and a backend application interpret the same data differently, is a recurring theme and the root cause of many evasion vulnerabilities.</p>
+                             <p><strong>State-Machine and State-Management Flaws:</strong> Attacks often succeed not by corrupting data, but by manipulating the state machines of network protocols, tricking devices into entering an insecure state.</p>
+                         </div>
+                     </div>
+                 </div>
+                  <div class="accordion-item bg-white rounded-lg shadow-md">
+                     <button class="accordion-header w-full text-left p-4 font-semibold text-lg flex justify-between items-center">
+                         <span>Emerging Research Trajectories</span>
+                         <span class="accordion-icon text-2xl font-light transform transition-transform">+</span>
+                     </button>
+                     <div class="accordion-content">
+                         <div class="p-4 border-t border-gray-200 text-gray-700 space-y-2">
+                            <p><strong>Securing Programmable Infrastructure:</strong> The rise of P4, eBPF, and SDN creates immense potential for defense but also introduces the control plane as a new, high-value attack surface.</p>
+                            <p><strong>Security of AI/ML-driven IDS:</strong> As defenses incorporate machine learning, a critical research direction is to analyze their robustness against adversarial examples and data poisoning attacks.</p>
+                            <p><strong>Formal Verification for Critical Protocols:</strong> The discovery of devastating protocol-level flaws highlights the need to apply formal methods during the design phase of internet standards, not after deployment.</p>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        </section>
+
+    </div>
+
+    <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div id="modal-content" class="modal-content bg-white w-full max-w-3xl max-h-[90vh] rounded-xl shadow-2xl overflow-y-auto transform scale-95">
+             <div class="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 id="modal-title" class="text-xl font-bold text-gray-800"></h2>
+                <button id="modal-close-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-gray-500 mb-1"><strong class="text-gray-700">Authors:</strong> <span id="modal-authors"></span></p>
+                <p class="text-sm text-gray-500 mb-4"><strong class="text-gray-700">Conference:</strong> <span id="modal-conference"></span></p>
+                <div class="space-y-4 text-gray-700">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-1">Abstract</h3>
+                        <p id="modal-abstract" class="text-base"></p>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg mb-1">Key Contribution & Relevance</h3>
+                        <p id="modal-contribution" class="text-base"></p>
+                    </div>
+                </div>
+                 <a id="modal-link" href="#" target="_blank" rel="noopener noreferrer" class="mt-6 inline-block bg-[#A67B5B] text-white px-5 py-2 rounded-md hover:bg-[#8e694d] transition-colors shadow-sm">View Publication ↗</a>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const papersData = [
+                {
+                    id: 1,
+                    title: "Wallbleed: A Memory Disclosure Vulnerability in the Great Firewall of China",
+                    authors: "Shencha Fan, et al.",
+                    conference: "NDSS",
+                    year: "25",
+                    contribution_category: "Systematic Analysis",
+                    target_tech: "National Firewall (GFW)",
+                    abstract: "This paper presents Wallbleed, a buffer over-read vulnerability in the DNS injection subsystem of the Great Firewall of China (GFW). This flaw caused censorship middleboxes to leak memory when processing specially crafted DNS queries, providing rare insights into the GFW's internal architecture.",
+                    contribution_text: "[Systematic Analysis]. This work is a premier example of a systematic security analysis of a large-scale network filtering system. It demonstrates that even sophisticated, state-sponsored infrastructure is susceptible to classic memory safety vulnerabilities.",
+                    link: "https://www.ndss-symposium.org/ndss-paper/wallbleed-a-memory-disclosure-vulnerability-in-the-great-firewall-of-china/"
+                },
+                {
+                    id: 2,
+                    title: "Understanding the Implementation and Security Implications of Protective DNS Services",
+                    authors: "Mingxuan Liu, et al.",
+                    conference: "NDSS",
+                    year: "24",
+                    contribution_category: "Systematic Analysis",
+                    target_tech: "Protective DNS (PDNS)",
+                    abstract: "This paper presents the first large-scale measurement study of Protective DNS (PDNS) services, which function as distributed firewalls. The study uncovered significant security flaws, including methods to evade blocking policies and launch DoS attacks.",
+                    contribution_text: "[Systematic Analysis]. This paper systematically analyzes a widely deployed but poorly understood security infrastructure. It reveals that the non-standardized implementation of these services has introduced new, systemic vulnerabilities into the DNS ecosystem.",
+                    link: "https://www.ndss-symposium.org/wp-content/uploads/2024-782-paper.pdf"
+                },
+                {
+                    id: 3,
+                    title: "ReDAN: An Empirical Study on Remote DoS Attacks Against NAT Networks",
+                    authors: "Xuewei Feng, et al.",
+                    conference: "NDSS",
+                    year: "25",
+                    contribution_category: "Novel Attack",
+                    target_tech: "NAT",
+                    abstract: "This paper demonstrates that NAT devices are vulnerable to remote, off-path DoS attacks. An attacker can exploit side channels and implementation flaws to prematurely terminate legitimate TCP connections for internal clients.",
+                    contribution_text: "[Novel Attack]. This work combines systematic analysis with a novel attack vector. It demonstrates that the foundational security assumption of NAT—stateful connection tracking—is broken in the vast majority of deployed devices.",
+                    link: "https://www.ndss-symposium.org/wp-content/uploads/2025-972-paper.pdf"
+                },
+                {
+                    id: 4,
+                    title: "The KeyTrap Denial-of-Service Algorithmic Complexity Attacks on DNSSEC",
+                    authors: "Elias Heftrig, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "Novel Attack",
+                    target_tech: "DNSSEC",
+                    abstract: "This paper introduces KeyTrap, a new DoS attack targeting DNSSEC-validating resolvers. The attack exploits a flaw in the DNSSEC standard itself, forcing resolvers into a computationally expensive validation workload that exhausts CPU resources.",
+                    contribution_text: "[Novel Attack]. KeyTrap is a devastating algorithmic complexity attack targeting a flaw in an IETF standard, rendering virtually all compliant implementations vulnerable by exploiting their specified operational logic.",
+                    link: "https://dblp.org/rec/conf/ccs/HeftrigSVW24.html"
+                },
+                {
+                    id: 5,
+                    title: "CAMP: Compositional Amplification Attacks against DNS",
+                    authors: "Huayi Duan, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "Novel Attack",
+                    target_tech: "DNS",
+                    abstract: "This work systematically investigates the DNS protocol for DoS amplification attacks, establishing a framework to analyze how amplification 'primitives' can be composed to create a multiplicative effect, achieving far greater amplification than previously understood.",
+                    contribution_text: "[Novel Attack]. This paper introduces a new methodology for discovering amplification attacks by reasoning about the compositional interaction of protocol features, fundamentally altering the threat model for DNS-based DoS.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/duan"
+                },
+                {
+                    id: 6,
+                    title: "Terrapin Attack: Breaking SSH Channel Integrity By Sequence Number Manipulation",
+                    authors: "Fabian Bäumer, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "Novel Attack",
+                    target_tech: "SSH",
+                    abstract: "The Terrapin attack is a novel prefix truncation attack against the SSH protocol, allowing a MitM attacker to delete packets from an encrypted session by manipulating sequence numbers, which can be used to downgrade connection security.",
+                    contribution_text: "[Novel Attack]. This is a fundamental attack on the integrity of the SSH protocol. It demonstrates that even mature, widely trusted protocols can harbor subtle logical flaws in their state machine and handshake design.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/b%C3%A4umer"
+                },
+                {
+                    id: 7,
+                    title: "Inbox Invasion: Exploiting MIME Ambiguities to Evade Email Attachment Detectors",
+                    authors: "Jiahe Zhang, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "Novel Attack",
+                    target_tech: "Email Security Gateway",
+                    abstract: "This paper presents a systematic evaluation of how parsing ambiguities in the MIME standard can be exploited to evade email attachment detectors, allowing an email deemed safe by a scanner to be rendered as malicious by the client.",
+                    contribution_text: "[Novel Attack]. This work perfectly illustrates the classic 'parser differential' problem, a recurring source of vulnerabilities where a security middlebox and an end application interpret the same data format differently.",
+                    link: "https://doi.org/10.1145/3658644.3670386"
+                },
+                 {
+                    id: 8,
+                    title: "You Cannot Escape Me: Detecting Evasions of SIEM Rules",
+                    authors: "Rafael Uetz, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "SIEM",
+                    abstract: "This research systematically analyzes the fragility of SIEM detection rules, showing that adversaries can easily evade them with minor modifications. It proposes AMIDES, a proof-of-concept system using machine learning to detect such evasions.",
+                    contribution_text: "[New Tool]. This work provides a crucial systematic analysis of the brittleness of signature-based IDS and introduces a novel defensive tool (AMIDES) to address it, offering a path to make IDS more resilient to trivial evasions.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/uetz"
+                },
+                {
+                    id: 9,
+                    title: "Manipulating OpenFlow Link Discovery Packet Forwarding for Topology Poisoning",
+                    authors: "Mingming Chen, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "Novel Attack",
+                    target_tech: "SDN",
+                    abstract: "This paper introduces Marionette, a stealthy topology poisoning attack against SDN controllers. By manipulating the forwarding of legitimate discovery packets, the attack tricks the controller into building an incorrect network map, which can lead to the bypass of security policies.",
+                    contribution_text: "[Novel Attack]. This is a sophisticated attack on the foundational security of SDN. By poisoning the controller's view of the network, Marionette undermines the entire security model of the SDN, rendering its policies useless.",
+                    link: "https://doi.org/10.1145/3658644.3690345"
+                },
+                {
+                    id: 10,
+                    title: "ResolverFuzz: Automated Discovery of DNS Resolver Vulnerabilities",
+                    authors: "Qifan Zhang, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "DNS",
+                    abstract: "ResolverFuzz is a new fuzzing system designed to find vulnerabilities in DNS resolvers. It combines a grammar for generating valid inputs with byte-level mutation and uses differential testing to detect non-crash logical flaws. It found 23 new vulnerabilities.",
+                    contribution_text: "[New Tool]. This is a highly effective, specialized tool that demonstrates the power of domain-specific, state-aware fuzzing for critical internet infrastructure, highlighting the inadequacy of general-purpose fuzzers.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/zhang-qifan"
+                },
+                 {
+                    id: 11,
+                    title: "ReqsMiner: Automated Discovery of CDN Forwarding Request Inconsistencies",
+                    authors: "Linkai Zheng, et al.",
+                    conference: "NDSS",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "CDN",
+                    abstract: "ReqsMiner is a fuzzing framework to automatically discover inconsistencies in how CDNs parse and forward HTTP requests. It uses a grammar-based fuzzer guided by reinforcement learning to find vulnerabilities like request smuggling and DoS.",
+                    contribution_text: "[New Tool]. This tool targets the complex logic of CDNs, which function as massive, distributed WAFs. It provides a scalable way to find vulnerabilities that could bypass WAF protections or disrupt service.",
+                    link: "https://github.com/Konano/ReqsMiner"
+                },
+                {
+                    id: 12,
+                    title: "RANsacked: A Domain-Informed Approach for Fuzzing LTE and 5G",
+                    authors: "Nathaniel Bennett, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "5G",
+                    abstract: "This paper presents RANsacked, a domain-informed fuzzing framework targeting the critical security boundary between the Radio Access Network (RAN) and the Core Network in LTE and 5G systems, using deep protocol knowledge to generate effective test cases.",
+                    contribution_text: "[New Tool]. This research pushes automated vulnerability discovery into the specialized domain of cellular network infrastructure, providing a critical tool for auditing the security of modern mobile communications.",
+                    link: "https://wspr.csc.ncsu.edu/news.html"
+                },
+                {
+                    id: 13,
+                    title: "No Peer, no Cry: Network Application Fuzzing via Fault Injection",
+                    authors: "Nils Bars, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "Network Protocol",
+                    abstract: "This paper introduces a novel approach to fuzzing network applications by using fault injection at the system call level to simulate network events and errors, allowing the fuzzer to efficiently explore error-handling code paths.",
+                    contribution_text: "[New Tool]. This work solves a major practical challenge in network application fuzzing: testing the robustness of error-handling logic, a common source of DoS vulnerabilities.",
+                    link: "https://doi.org/10.1145/3658644.3670355"
+                },
+                {
+                    id: 14,
+                    title: "HYPERPILL: Fuzzing for Hypervisor-bugs by Leveraging the Hardware Virtualization Interface",
+                    authors: "Alexander Bulekov, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "Hypervisor",
+                    abstract: "HYPERPILL is a generic, black-box hypervisor fuzzer that works by leveraging the standardized hardware-virtualization interface. It can test all major attack surfaces without source code access, and found 26 new bugs in mature hypervisors.",
+                    contribution_text: "[New Tool]. A significant breakthrough for auditing hypervisors. As virtualized firewalls are common, a hypervisor flaw can collapse security guarantees. HYPERPILL provides a powerful method for finding such critical flaws.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/bulekov"
+                },
+                {
+                    id: 15,
+                    title: "SmartCookie: Blocking Large-Scale SYN Floods with a Split-Proxy Defense",
+                    authors: "Sophia Yoo, et al.",
+                    conference: "USENIX Security",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "DoS Defense",
+                    abstract: "SmartCookie is a system for mitigating SYN floods using programmable network switches. It offloads the validation of SYN cookies to the switch hardware, allowing it to filter attack traffic at line rate and protect servers from CPU exhaustion.",
+                    contribution_text: "[New Tool]. SmartCookie presents a new architectural blueprint for high-performance DoS defense, intelligently splitting logic between programmable hardware and software to achieve superior scalability and security.",
+                    link: "https://www.usenix.org/conference/usenixsecurity24/presentation/yoo"
+                },
+                {
+                    id: 16,
+                    title: "5G-Spector: An O-RAN Compliant Layer-3 Cellular Attack Detection Service",
+                    authors: "Haohuang Wen, et al.",
+                    conference: "NDSS",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "5G",
+                    abstract: "5G-Spector is a framework to detect Layer-3 protocol exploits within the new Open RAN (O-RAN) 5G architecture. It leverages O-RAN's programmability to create a real-time attack detection service.",
+                    contribution_text: "[New Tool]. A forward-looking blueprint for a programmable, software-defined IDS for 5G networks, capitalizing on the open architecture to enable security services impossible in previous cellular generations.",
+                    link: "https://www.ndss-symposium.org/ndss-paper/5g-spector-an-o-ran-compliant-layer-3-cellular-attack-detection-service/"
+                },
+                {
+                    id: 17,
+                    title: "Detecting Tunneled Flooding Traffic via Deep Semantic Analysis of Packet Length Patterns",
+                    authors: "Chuanpu Fu, et al.",
+                    conference: "ACM CCS",
+                    year: "24",
+                    contribution_category: "New Tool",
+                    target_tech: "IDS",
+                    abstract: "This paper presents Exosphere, a system to detect tunneled DDoS flooding attacks. It operates on packet length metadata, using a deep learning model to identify statistical correlations in packet length distributions that differ from benign traffic.",
+                    contribution_text: "[New Tool]. Exosphere provides a novel IDS technique for the challenging problem of detecting malicious traffic in an encrypted internet, offering a way to identify attacks without needing decryption.",
+                    link: "https://doi.org/10.1145/3658644.3670353"
+                },
+                {
+                    id: 18,
+                    title: "ERW-Radar: An adaptive detection system against evasive ransomware",
+                    authors: "Lingbo Zhao, et al.",
+                    conference: "NDSS",
+                    year: "25",
+                    contribution_category: "New Tool",
+                    target_tech: "Host-based IDS",
+                    abstract: "ERW-Radar is a host-based detection system for modern, evasive ransomware. It uses a hybrid strategy, combining contextual correlation of I/O behavior with fine-grained content analysis to detect malicious patterns.",
+                    contribution_text: "[New Tool]. While host-based, its techniques for detecting low-and-slow attacks are applicable to network security. It advances behavioral threat detection with a robust, adaptive framework.",
+                    link: "https://www.ndss-symposium.org/ndss-paper/erw-radar-an-adaptive-detection-system-against-evasive-ransomware-by-contextual-behavior-detection-and-fine-grained-content-analysis/"
+                }
+            ];
+
+            const papersContainer = document.getElementById('papers-container');
+            const contributionFilters = document.getElementById('contribution-filters');
+            const conferenceFilters = document.getElementById('conference-filters');
+            const filterCountEl = document.getElementById('filter-count');
+            
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modal-content');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+
+            let chartInstance = null;
+            let currentFilters = {
+                contribution: 'All',
+                conference: 'All'
+            };
+
+            function createPaperCard(paper) {
+                const card = document.createElement('div');
+                card.className = 'card bg-white rounded-xl shadow-md p-6 cursor-pointer transform hover:-translate-y-1 hover:shadow-xl transition-all duration-300';
+                card.dataset.id = paper.id;
+
+                const categoryColors = {
+                    "Novel Attack": "bg-red-100 text-red-800",
+                    "New Tool": "bg-blue-100 text-blue-800",
+                    "Systematic Analysis": "bg-green-100 text-green-800"
+                };
+
+                card.innerHTML = `
+                    <div class="flex flex-col h-full">
+                        <div class="flex-grow">
+                             <h3 class="font-bold text-lg text-gray-800 mb-2">${paper.title}</h3>
+                             <p class="text-sm text-gray-500 mb-4">${paper.conference} '${paper.year}</p>
+                        </div>
+                        <div class="mt-auto pt-4 flex justify-between items-center">
+                            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full ${categoryColors[paper.contribution_category] || 'bg-gray-200 text-gray-800'}">
+                                ${paper.contribution_category}
+                            </span>
+                            <span class="text-xs font-medium text-gray-600">${paper.target_tech}</span>
+                        </div>
+                    </div>
+                `;
+                card.addEventListener('click', () => showModal(paper.id));
+                return card;
+            }
+
+            function renderPapers(papers) {
+                papersContainer.innerHTML = '';
+                papers.forEach(paper => {
+                    papersContainer.appendChild(createPaperCard(paper));
+                });
+            }
+            
+            function applyFilters() {
+                const filteredPapers = papersData.filter(paper => {
+                    const contributionMatch = currentFilters.contribution === 'All' || paper.contribution_category === currentFilters.contribution;
+                    const conferenceMatch = currentFilters.conference === 'All' || paper.conference === currentFilters.conference;
+                    return contributionMatch && conferenceMatch;
+                });
+                
+                renderPapers(filteredPapers);
+                updateChart(filteredPapers);
+                filterCountEl.textContent = `Showing ${filteredPapers.length} of ${papersData.length} papers.`;
+            }
+
+            function handleFilterClick(event) {
+                const target = event.target;
+                if (!target.matches('.filter-btn')) return;
+
+                const filterGroup = target.dataset.filterGroup;
+                const filterValue = target.dataset.filter;
+                currentFilters[filterGroup] = filterValue;
+                
+                document.querySelectorAll(`button[data-filter-group="${filterGroup}"]`).forEach(btn => {
+                    btn.classList.remove('active-filter');
+                });
+                target.classList.add('active-filter');
+
+                applyFilters();
+            }
+
+            function updateChart(filteredData) {
+                const targetCounts = filteredData.reduce((acc, paper) => {
+                    acc[paper.target_tech] = (acc[paper.target_tech] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const sortedTargets = Object.entries(targetCounts).sort(([, a], [, b]) => b - a);
+
+                const labels = sortedTargets.map(item => item[0]);
+                const data = sortedTargets.map(item => item[1]);
+                
+                if (chartInstance) {
+                    chartInstance.data.labels = labels;
+                    chartInstance.data.datasets[0].data = data;
+                    chartInstance.update();
+                } else {
+                    const ctx = document.getElementById('papersChart').getContext('2d');
+                    chartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Number of Papers',
+                                data: data,
+                                backgroundColor: 'rgba(166, 123, 91, 0.7)',
+                                borderColor: 'rgba(166, 123, 91, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: '#4A4A4A',
+                                    titleFont: { size: 14, weight: 'bold' },
+                                    bodyFont: { size: 12 },
+                                    padding: 10,
+                                    cornerRadius: 4
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: 'rgba(0,0,0,0.05)'
+                                    },
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                },
+                                y: {
+                                    grid: {
+                                        display: false
+                                    },
+                                     ticks: {
+                                        autoSkip: false,
+                                        callback: function(value) {
+                                            const label = this.getLabelForValue(value);
+                                            if (label.length > 20) {
+                                                return label.slice(0, 20) + '...';
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            function showModal(paperId) {
+                const paper = papersData.find(p => p.id === paperId);
+                if (!paper) return;
+
+                document.getElementById('modal-title').textContent = paper.title;
+                document.getElementById('modal-authors').textContent = paper.authors;
+                document.getElementById('modal-conference').textContent = `${paper.conference} '${paper.year}`;
+                document.getElementById('modal-abstract').textContent = paper.abstract;
+                document.getElementById('modal-contribution').textContent = paper.contribution_text;
+                document.getElementById('modal-link').href = paper.link;
+
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modalContent.classList.remove('scale-95');
+            }
+            
+            function hideModal() {
+                 modal.classList.add('opacity-0', 'pointer-events-none');
+                 modalContent.classList.add('scale-95');
+            }
+            
+            function setupAccordions() {
+                const accordionHeaders = document.querySelectorAll('.accordion-header');
+                accordionHeaders.forEach(header => {
+                    header.addEventListener('click', () => {
+                        const content = header.nextElementSibling;
+                        const icon = header.querySelector('.accordion-icon');
+                        
+                        header.parentElement.classList.toggle('open');
+                        
+                        if (content.classList.contains('open')) {
+                            content.classList.remove('open');
+                            icon.classList.remove('rotate-45');
+                            icon.textContent = '+';
+                        } else {
+                            content.classList.add('open');
+                            icon.classList.add('rotate-45');
+                            icon.textContent = '+';
+                        }
+                    });
+                });
+            }
+
+            contributionFilters.addEventListener('click', handleFilterClick);
+            conferenceFilters.addEventListener('click', handleFilterClick);
+            
+            modalCloseBtn.addEventListener('click', hideModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    hideModal();
+                }
+            });
+
+            renderPapers(papersData);
+            updateChart(papersData);
+            setupAccordions();
+        });
+    </script>
+</body>
+</html>
