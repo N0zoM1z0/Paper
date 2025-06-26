@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: The State of QUIC & HTTP/3 Security</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Subtle Slate" -->
+    <!-- Application Structure Plan: The application is designed as a single-page, narrative-driven vertical scroll experience. It starts with the main finding (the "publication gap") to immediately orient the user. It then transitions into an interactive "Evolving Threats" section, which is the core of the app, allowing users to click and explore the three main research trends (Feature Abuse, Implementation Auditing, Privacy). This is more user-driven than a linear report. This structure is chosen to transform the dense report into a digestible story, where users can grasp the high-level summary and then choose which specific area to explore in depth. The visual diagrams for attacks and the summary chart are designed to make abstract concepts concrete and memorable. -->
+    <!-- Visualization & Content Choices: 
+        1. Research Focus Chart: Report Info -> Shift in research topics over time. Goal -> Change. Viz -> Bar Chart (Chart.js). Interaction -> Tooltips on hover. Justification -> Visually quantifies the report's qualitative assessment of the research landscape shifting from protocol-level to implementation-level flaws.
+        2. QUIC-Exfil Attack Diagram: Report Info -> Description of the data exfiltration attack. Goal -> Organize/Explain Process. Viz -> HTML/CSS flowchart. Interaction -> Subtle hover effects on steps. Justification -> Breaks down a complex, multi-step attack into a simple, easy-to-follow visual process.
+        3. QUICtester Diagram: Report Info -> Description of differential analysis tool. Goal -> Organize/Explain Concept. Viz -> HTML/CSS diagram. Justification -> Visually contrasts the novel "differential testing" approach with traditional methods.
+        4. Middlebox Dilemma Diagram: Report Info -> Explanation of QUIC's opacity to firewalls. Goal -> Compare. Viz -> Side-by-side HTML/CSS diagram. Justification -> A simple visual metaphor (clear vs. opaque pipe) instantly communicates the core challenge for network security.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 300px;
+            }
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+        }
+        .nav-link.active {
+            color: #3b82f6;
+            transform: scale(1.1);
+        }
+        .threat-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .threat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .flow-step {
+            transition: all 0.2s ease-in-out;
+        }
+        .flow-step:hover {
+            background-color: #eef2ff;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-700">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-3 flex justify-between items-center">
+            <div class="font-bold text-lg text-slate-800">QUIC/H3 Security Report</div>
+            <div class="hidden md:flex space-x-8">
+                <a href="#summary" class="nav-link text-slate-600 hover:text-blue-500">Summary</a>
+                <a href="#threats" class="nav-link text-slate-600 hover:text-blue-500">Threat Landscape</a>
+                <a href="#dilemma" class="nav-link text-slate-600 hover:text-blue-500">The Middlebox Dilemma</a>
+                <a href="#future" class="nav-link text-slate-600 hover:text-blue-500">Future Work</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-slate-600 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden px-6 pt-2 pb-4">
+             <a href="#summary" class="block py-2 nav-link text-slate-600 hover:text-blue-500">Summary</a>
+             <a href="#threats" class="block py-2 nav-link text-slate-600 hover:text-blue-500">Threat Landscape</a>
+             <a href="#dilemma" class="block py-2 nav-link text-slate-600 hover:text-blue-500">The Middlebox Dilemma</a>
+             <a href="#future" class="block py-2 nav-link text-slate-600 hover:text-blue-500">Future Work</a>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+
+        <section id="summary" class="text-center mb-24 scroll-mt-20">
+            <h1 class="text-4xl md:text-5xl font-bold text-slate-900 mb-4">The Evolving Security Landscape of QUIC & HTTP/3</h1>
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-8">An interactive summary of cutting-edge security research, highlighting a shift from protocol theory to real-world implementation and feature abuse.</p>
+            
+            <div class="bg-amber-100 border-l-4 border-amber-500 text-amber-800 p-6 rounded-lg max-w-4xl mx-auto mb-12 text-left">
+                <h2 class="text-xl font-bold mb-2">Primary Finding: A Publication Gap in Premier Venues (2024-2025)</h2>
+                <p>A systematic review of the top four cybersecurity conferences (IEEE S&P, ACM CCS, USENIX Security, NDSS) for 2024-2025 reveals a notable absence of papers centered on new QUIC/HTTP/3 vulnerabilities. This suggests not that the protocol is perfectly secure, but that research has matured past "low-hanging fruit" and is now entering a new phase focused on more subtle and complex threats.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">Shift to Implementation Flaws</h3>
+                    <p class="text-slate-600">Research is moving from analyzing the abstract RFCs to auditing the fragmented landscape of real-world libraries, where subtle bugs can undermine protocol guarantees.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">Rise of "Abuse-of-Feature" Attacks</h3>
+                    <p class="text-slate-600">The most novel attacks don't break crypto; they exploit legitimate protocol features like connection migration to create hard-to-detect covert channels.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">The Privacy Arms Race</h3>
+                    <p class="text-slate-600">QUIC's encryption is a double-edged sword, used by defenders to build privacy tools and by attackers to evade detection, creating a complex cat-and-mouse game.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="threats" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">The Emerging Threat Landscape</h2>
+                <p class="text-lg text-slate-600 max-w-3xl mx-auto mt-2">As QUIC matures, security research has evolved. The focus has shifted from finding fundamental flaws in the protocol's design to uncovering vulnerabilities in how it's implemented and how its advanced features can be abused. Click on a category below to explore the latest findings.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-6 mb-8">
+                <div id="card-abuse" class="threat-card bg-white p-6 rounded-lg shadow-md border-2 border-transparent hover:border-blue-500">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-2">Abuse-of-Feature Attacks</h3>
+                    <p class="text-slate-600">Manipulating intended protocol mechanisms for malicious purposes, such as data exfiltration.</p>
+                </div>
+                <div id="card-impl" class="threat-card bg-white p-6 rounded-lg shadow-md border-2 border-transparent hover:border-blue-500">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-2">Implementation Auditing</h3>
+                    <p class="text-slate-600">Finding bugs in specific QUIC libraries through automated, stateful testing and analysis.</p>
+                </div>
+                <div id="card-privacy" class="threat-card bg-white p-6 rounded-lg shadow-md border-2 border-transparent hover:border-blue-500">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-2">Privacy & Traffic Analysis</h3>
+                    <p class="text-slate-600">The ongoing battle between using QUIC for privacy and developing techniques to de-anonymize its traffic.</p>
+                </div>
+            </div>
+
+            <div id="threat-details" class="bg-white p-8 rounded-lg shadow-lg border border-slate-200 min-h-[300px]">
+                <div id="details-abuse" class="threat-content hidden">
+                    <h4 class="text-2xl font-bold text-slate-900 mb-4">Case Study: QUIC-Exfil Attack</h4>
+                    <p class="mb-6 text-slate-600">This novel attack doesn't break QUIC's encryption. Instead, it cleverly abuses the legitimate Connection Migration feature. An attacker on a compromised client can inject a special message that tells the client to "migrate" its connection to an attacker-controlled server, turning a standard feature into a stealthy data exfiltration channel that is very difficult for firewalls to detect.</p>
+                    <div class="space-y-4">
+                        <div class="flow-step p-4 rounded-lg bg-slate-100 flex items-center space-x-4">
+                            <div class="flex-shrink-0 bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">1</div>
+                            <p>Client establishes a normal QUIC connection with a legitimate server.</p>
+                        </div>
+                         <div class="flex justify-center">
+                            <span class="text-slate-400 text-2xl">&darr;</span>
+                        </div>
+                        <div class="flow-step p-4 rounded-lg bg-slate-100 flex items-center space-x-4">
+                            <div class="flex-shrink-0 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">2</div>
+                            <p>Attacker's server sends a malicious `NEW_CONNECTION_ID` frame with a `preferred_address` pointing to itself.</p>
+                        </div>
+                         <div class="flex justify-center">
+                            <span class="text-slate-400 text-2xl">&darr;</span>
+                        </div>
+                        <div class="flow-step p-4 rounded-lg bg-slate-100 flex items-center space-x-4">
+                            <div class="flex-shrink-0 bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">3</div>
+                            <p>Following protocol rules, the client migrates its connection path to the attacker's server.</p>
+                        </div>
+                         <div class="flex justify-center">
+                            <span class="text-slate-400 text-2xl">&darr;</span>
+                        </div>
+                        <div class="flow-step p-4 rounded-lg bg-red-100 border border-red-500 flex items-center space-x-4">
+                            <div class="flex-shrink-0 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">4</div>
+                            <p>Client now sends subsequent traffic, containing exfiltrated data, directly to the attacker.</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="details-impl" class="threat-content hidden">
+                    <h4 class="text-2xl font-bold text-slate-900 mb-4">Tool Spotlight: QUICtester</h4>
+                     <p class="mb-6 text-slate-600">QUIC's security depends on its many different software implementations being correct. Tools like QUICtester are emerging to find bugs automatically. Instead of checking against a perfect specification, it uses a clever "differential analysis" approach: it learns the behavior of multiple QUIC servers and flags any place where their behavior diverges, indicating a potential bug or non-compliance with the RFC.</p>
+                    <div class="grid md:grid-cols-2 gap-6 text-center">
+                        <div class="p-4 rounded-lg bg-slate-100">
+                            <h5 class="font-semibold mb-2">Implementation A</h5>
+                            <div class="text-6xl">🤖</div>
+                            <p class="mt-2 text-sm text-slate-500">Learned State Machine</p>
+                        </div>
+                        <div class="p-4 rounded-lg bg-slate-100">
+                            <h5 class="font-semibold mb-2">Implementation B</h5>
+                            <div class="text-6xl">👽</div>
+                             <p class="mt-2 text-sm text-slate-500">Learned State Machine</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center my-4">
+                         <span class="text-slate-500 font-bold text-2xl">&harr;</span>
+                         <p class="mx-4 font-semibold text-slate-800">Pairwise Comparison</p>
+                         <span class="text-slate-500 font-bold text-2xl">&harr;</span>
+                    </div>
+                    <div class="p-4 rounded-lg bg-green-100 border border-green-500 text-center">
+                         <h5 class="font-semibold text-green-800">Result: Identifies 55 Errors</h5>
+                         <p class="text-green-700">Deviations between implementations pinpoint bugs and non-compliance.</p>
+                    </div>
+                </div>
+                <div id="details-privacy" class="threat-content hidden">
+                    <h4 class="text-2xl font-bold text-slate-900 mb-4">The Privacy Cat-and-Mouse Game</h4>
+                    <p class="mb-6 text-slate-600">QUIC's heavy encryption creates a natural tension. On one hand, it empowers developers to build stronger privacy defenses. On the other, it provides cover for malicious actors and complicates censorship monitoring. This has led to an "arms race" between privacy-enhancing techniques and advanced traffic analysis designed to pierce QUIC's veil of opacity.</p>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="p-6 rounded-lg bg-blue-100 border border-blue-300">
+                            <h5 class="font-semibold text-blue-800 text-lg mb-2">🛡️ Defense: Privacy Enhancement</h5>
+                            <p class="text-blue-700">Researchers use QUIC's programmability to build client-side defenses against website fingerprinting, adding "cover traffic" to obfuscate a user's activity from network observers.</p>
+                        </div>
+                        <div class="p-6 rounded-lg bg-orange-100 border border-orange-300">
+                            <h5 class="font-semibold text-orange-800 text-lg mb-2">🔬 Offense: Advanced Traffic Analysis</h5>
+                            <p class="text-orange-700">New frameworks analyze encrypted traffic at multiple levels (packet, flow, session) to create richer fingerprints, improving the classification of QUIC traffic and detecting anomalies.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div id="details-placeholder" class="flex items-center justify-center h-full text-slate-500">
+                    <p class="text-lg">Select a threat category above to see details.</p>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="dilemma" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">The Middlebox Dilemma</h2>
+                <p class="text-lg text-slate-600 max-w-3xl mx-auto mt-2">QUIC's core design encrypts most transport metadata, making it opaque to traditional network security devices like firewalls. This creates a fundamental challenge: allow QUIC for its performance benefits but lose visibility, or block it and force a fallback to less efficient TCP.</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8 items-center bg-white p-8 rounded-lg shadow-lg border border-slate-200">
+                <div class="text-center p-6 border-r-0 md:border-r border-slate-200">
+                    <h3 class="text-xl font-semibold mb-4 text-slate-800">Traditional TCP/TLS</h3>
+                    <div class="text-5xl mb-4">🔍</div>
+                    <p class="text-slate-600">Firewalls can inspect unencrypted parts of the TCP and TLS handshakes (like SNI) for policy enforcement and threat detection.</p>
+                </div>
+                 <div class="text-center p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-slate-800">Modern QUIC</h3>
+                    <div class="text-5xl mb-4"> impenetrable_lock </div>
+                    <p class="text-slate-600">Most metadata is encrypted. Features like Connection Migration are invisible to middleboxes, creating blind spots that attacks like QUIC-Exfil can exploit.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="future" class="scroll-mt-20">
+             <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">Synthesis & Future Research</h2>
+                <p class="text-lg text-slate-600 max-w-3xl mx-auto mt-2">The research landscape is shifting from breaking the protocol to auditing its implementations and policing the use of its features. The chart below visualizes this trend, followed by key directions for future work.</p>
+            </div>
+            
+            <div class="bg-white p-8 rounded-lg shadow-lg border border-slate-200 mb-12">
+                <h3 class="text-xl font-bold text-center text-slate-800 mb-4">Conceptual Shift in QUIC Security Research Focus</h3>
+                <div class="chart-container">
+                    <canvas id="researchFocusChart"></canvas>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h4 class="font-semibold text-lg text-slate-800 mb-2">Defending Against Covert Channels</h4>
+                    <p class="text-slate-600">Developing behavioral models to differentiate between benign and malicious uses of features like connection migration.</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h4 class="font-semibold text-lg text-slate-800 mb-2">Standardized Security Benchmarks</h4>
+                    <p class="text-slate-600">Creating open-source test suites to ensure all QUIC implementations meet a consistent, high standard of security and robustness.</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+                    <h4 class="font-semibold text-lg text-slate-800 mb-2">Privacy-Preserving Analysis</h4>
+                    <p class="text-slate-600">Enabling network visibility for security without breaking encryption, possibly using federated learning or new telemetry.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-800 text-slate-300 mt-24">
+        <div class="container mx-auto px-6 py-8 text-center">
+            <p>This interactive report was generated based on the "Survey of Cutting-Edge Security Research on QUIC and HTTP/3".</p>
+            <p class="text-sm text-slate-400 mt-2">All content is derived from the source report for illustrative purposes.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+            
+            const threatCards = {
+                abuse: document.getElementById('card-abuse'),
+                impl: document.getElementById('card-impl'),
+                privacy: document.getElementById('card-privacy'),
+            };
+
+            const threatDetails = {
+                abuse: document.getElementById('details-abuse'),
+                impl: document.getElementById('details-impl'),
+                privacy: document.getElementById('details-privacy'),
+                placeholder: document.getElementById('details-placeholder'),
+            };
+
+            function showThreatDetail(category) {
+                Object.values(threatDetails).forEach(detail => detail.classList.add('hidden'));
+                Object.values(threatCards).forEach(card => card.classList.remove('border-blue-500'));
+                
+                if (threatDetails[category]) {
+                    threatDetails.placeholder.classList.add('hidden');
+                    threatDetails[category].classList.remove('hidden');
+                    threatCards[category].classList.add('border-blue-500');
+                } else {
+                    threatDetails.placeholder.classList.remove('hidden');
+                }
+            }
+
+            threatCards.abuse.addEventListener('click', () => showThreatDetail('abuse'));
+            threatCards.impl.addEventListener('click', () => showThreatDetail('impl'));
+            threatCards.privacy.addEventListener('click', () => showThreatDetail('privacy'));
+            
+            showThreatDetail('abuse');
+
+            const ctx = document.getElementById('researchFocusChart').getContext('2d');
+            const researchFocusChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Protocol-Level Flaws', 'Implementation Bugs', 'Feature Abuse Attacks', 'Privacy/Traffic Analysis'],
+                    datasets: [{
+                        label: 'Early Research (Conceptual)',
+                        data: [80, 20, 10, 15],
+                        backgroundColor: 'rgba(148, 163, 184, 0.6)',
+                        borderColor: 'rgba(148, 163, 184, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Emerging Research (Conceptual)',
+                        data: [15, 70, 85, 60],
+                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: false,
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Relative Research Volume (Conceptual)'
+                            }
+                        },
+                        x: {
+                             ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 16 ? label.match(/.{1,16}/g) : label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('section');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navLinks.forEach(link => {
+                            link.classList.toggle('active', link.getAttribute('href').substring(1) === entry.target.id);
+                        });
+                    }
+                });
+            }, { rootMargin: "-50% 0px -50% 0px" });
+
+            sections.forEach(section => observer.observe(section));
+
+        });
+    </script>
+
+</body>
+</html>

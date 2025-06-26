@@ -1,0 +1,7 @@
+docker run --rm --network ssrf-net --entrypoint /usr/local/bin/crawlergo \
+    -v "$(pwd)":/app \
+    sec32/crawlergo:latest \
+    -c /usr/lib/chromium/chrome \
+    -t 20 \
+    --output-json /app/crawlergo_results.json \
+    http://testphp.vulnweb.com/

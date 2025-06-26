@@ -29,7 +29,7 @@ phpize
 make -j$(nproc)
 
 apt update && apt-get install -y mysql-client
-mysql -h ssrf-db -u root -p
+mysql -h ssrf_db -u root -p
 
 CREATE DATABASE IF NOT EXISTS ssrf_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE ssrf_db;
@@ -71,11 +71,12 @@ exit;
 # and modify Fuzzer/fuzzer.php to correct the database settings
 # open 4 terminal
 
+# docker exec -it SSRFuzz-u22 /bin/bash
 # 1.
 cd /SSRFuzz/Fuzzer && python3 fuzzer.py
 # 2.
 cd /SSRFuzz/Fuzzer && python3 detector.py
 # 3.
-cd /TaintInfer/verify && ./run.sh
+cd /SSRFuzz/TaintInfer/verify && ./run.sh
 # 4.
 curl "http://localhost:8000/params.php?url=1&nnn=2"
